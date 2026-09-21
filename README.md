@@ -117,9 +117,9 @@ EventBookingSystem/
   },
   "JwtSettings": {
     "Secret": "YourSUPER_Secret_Key_At_Least_32_Characters_Long!",
-    "Issuer": "EventBookingApi",
-    "Audience": "EventBookingClient",
-    "ExpiryMinutes": "60"
+    "Issuer": "TicketCraft",
+    "Audience": "TicketCraftClient",
+    "ExpiryMinutes": "120"
   },
   "Logging": {
     "LogLevel": {
@@ -160,9 +160,3 @@ API будет доступно по адресу `http://localhost:5000` (ил�
 - `404 Not Found` — запрашиваемый ресурс (событие/пользователь) не найден (`NotFoundException`).
 - `409 Conflict` — бизнес-конфликты (`InvalidOperationException`).
 - `500 Internal Server Error` — непредвиденные ошибки сервера.
-
----
-
-## 📄 Лицензия
-
-Проект распространяется под лицензией [MIT](LICENSE).
