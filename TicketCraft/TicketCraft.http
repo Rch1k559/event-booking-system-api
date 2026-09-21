@@ -1,6 +1,0 @@
-@TicketCraft_HostAddress = http://localhost:5133
-
-GET {{TicketCraft_HostAddress}}/weatherforecast/
-Accept: application/json
-
-###
