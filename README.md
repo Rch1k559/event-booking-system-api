@@ -1,114 +1,112 @@
 # Event Booking System API
 
-Высокопроизводительный REST API сервиса бронирования билетов на мероприятия, построенный с использованием **Clean Architecture**, паттерна **CQRS** и фреймворка **ASP.NET Core**.
+High-performance Event Booking REST API built with **Clean Architecture**, **CQRS** pattern, and **ASP.NET Core** (.NET 8).
 
----
+## Architecture Overview
 
-## Архитектура проекта
-
-Проект реализован по принципам **Clean Architecture** (Чистая архитектура) с разделением ответственности по слоям:
+The project follows **Clean Architecture** principles with clear separation of concerns across layers:
 
 ```text
 EventBookingSystem/
 ├── src/
-│   ├── Domain/                 # Ядро системы: доменные сущности и перечисления (Enums)
-│   ├── Application/            # CQRS: Команды, Запросы, DTOs, Валидация, Pipeline Behaviors
+│   ├── Domain/                 # Core domain entities and enums
+│   ├── Application/            # CQRS: Commands, Queries, DTOs, Validation, Pipeline Behaviors
 │   ├── Infrastructure/         # EF Core, AppDbContext, JWT, Hashing, Background Services
-│   └── WebApi/                 # Controllers, Middlewares, Настройки аутентификации, Program.cs
+│   └── WebApi/                 # Controllers, Middlewares, Auth Configuration, Program.cs
 ```
 
-### Разделение по слоям
+### Layer Responsibilities
 
-1. **Domain (Доменный слой)**
-   - Сущности: `User`, `Event`, `TicketType`, `Booking`, `BookingItem`, `AuditLog`.
-   - Роли пользователей: `Customer`, `Organizer`, `Admin`.
-   - Статусы мероприятий: `Draft`, `Published`, `Cancelled`.
-   - Статусы бронирования: `Pending`, `Confirmed`, `Cancelled`.
+1. **Domain Layer**
+   - Core Entities: `User`, `Event`, `TicketType`, `Booking`, `BookingItem`, `AuditLog`.
+   - User Roles: `Customer`, `Organizer`, `Admin`.
+   - Event Statuses: `Draft`, `Published`, `Cancelled`.
+   - Booking Statuses: `Pending`, `Confirmed`, `Cancelled`.
 
-2. **Application (Прикладной слой)**
-   - **CQRS**: Использование библиотеки `MediatR` для разделения чтения и записи (`Commands` и `Queries`).
+2. **Application Layer**
+   - **CQRS**: Utilizes `MediatR` to separate read and write pipelines (`Commands` and `Queries`).
    - **Pipeline Behaviors**:
-     - `LoggingBehavior`: Автоматическое логирование всех запросов с корреляционными ID (`CorrelationId`) и замером времени выполнения.
-     - `ValidationBehavior`: Автоматическая валидация всех входящих команд через `FluentValidation`.
-   - **DTOs & Models**: Пагинированные результаты (`PagedResult<T>`), структуры ответов на авторизацию и бронирование.
+     - `LoggingBehavior`: Logs request execution times and correlation IDs (`CorrelationId`).
+     - `ValidationBehavior`: Performs request validation using `FluentValidation`.
+   - **DTOs & Models**: Pagination support (`PagedResult<T>`), authentication and booking response payloads.
 
-3. **Infrastructure (Слой инфраструктуры)**
-   - **EF Core & PostgreSQL**: Конфигурации моделей (`IEntityTypeConfiguration`), индексы, каскадные удаления и точность типов (`Npgsql`).
-   - **Security**: Генерация JWT-токенов (`JwtTokenGenerator`) и хеширование паролей (`PasswordHasher` на базе BCrypt).
-   - **Background Worker**: `ExpiredBookingsCleanerHostedService` — фоновая служба, периодически (каждую минуту) отменяющая просроченные бронирования (`CancelExpiredBookingsCommand`).
+3. **Infrastructure Layer**
+   - **EF Core & PostgreSQL**: Model configurations (`IEntityTypeConfiguration`), indices, cascading deletes, and column precision (`Npgsql`).
+   - **Security**: JWT token generation (`JwtTokenGenerator`) and BCrypt password hashing (`PasswordHasher`).
+   - **Background Services**: `ExpiredBookingsCleanerHostedService` — a background worker that runs periodically (every 1 minute) to cancel expired pending bookings (`CancelExpiredBookingsCommand`).
 
-4. **WebApi (Слой представления)**
-   - **Controllers**: Эндпоинты управления пользователями, мероприятиями и бронированиями.
-   - **Middlewares**: `ExceptionHandlingMiddleware` для централизованной обработки ошибок (Validation, NotFound, Conflict, Internal Server Error).
-
----
-
-## Технологический стек
-
-- **Язык & Платформа**: C# / .NET 8+
-- **Архитектурные паттерны**: Clean Architecture, CQRS, Pipeline Pattern, Repository/UnitOfWork (через EF Core `IApplicationDbContext`)
-- **База данных**: PostgreSQL (Entity Framework Core + Npgsql)
-- **Медиатор**: MediatR
-- **Валидация**: FluentValidation
-- **Аутентификация & Безопасность**: JWT Bearer Tokens, BCrypt Password Hashing
-- **Фоновые задачи**: ASP.NET Core Hosted Services (`IHostedService` / `BackgroundService`)
+4. **WebApi Layer**
+   - **Controllers**: Endpoints for managing users, events, and ticket bookings.
+   - **Middlewares**: `ExceptionHandlingMiddleware` for centralized error handling (Validation, NotFound, Conflict, Internal Server Error).
 
 ---
 
-## Основной функционал
+## Tech Stack
 
-### 1. Пользователи и Авторизация
-- Регистрация пользователей (`RegisterUserCommand`) с ролями (`Customer`, `Organizer`). *Регистрация роли Admin заблокирована на уровне валидации.*
-- Аутентификация (`LoginUserCommand`) с выдачей JWT-токена.
-- Профиль текущего пользователя (`GetCurrentUserQuery` по эндпоинту `/api/user/me`).
-
-### 2. Управление Мероприятиями (Events)
-- Создание мероприятий организаторами в статусе `Draft` с возможностью указания типов билетов (`CreateEventCommand`).
-- Публикация мероприятий (`PublishEventCommand`) с проверкой прав доступа организатора и отправкой уведомлений (`EventPublishedNotification`).
-- Просмотр списка опубликованных мероприятий с фильтрацией, поиском и пагинацией (`GetPublishedEventsQuery`).
-- Получение детальной информации о мероприятии (`GetEventDetailsQuery`).
-
-### 3. Бронирование и Билеты (Bookings & Tickets)
-- Резервирование билетов (`ReserveTicketsCommand`) с временной блокировкой мест. При резервировании устанавливается срок действия брони (15 минут).
-- Подтверждение бронирования (`ConfirmBookingCommand`).
-- Автоматическая отмена просроченных броней фоновым сервисом с возвратом доступного количества билетов (`ExpiredBookingsCleanerHostedService`).
+- **Language & Framework**: C# / .NET 8
+- **Architectural Patterns**: Clean Architecture, CQRS, Pipeline Pattern, Repository/UnitOfWork (via EF Core `IApplicationDbContext`)
+- **Database**: PostgreSQL (Entity Framework Core + Npgsql)
+- **Mediator**: MediatR
+- **Validation**: FluentValidation
+- **Authentication & Security**: JWT Bearer Tokens, BCrypt Password Hashing
+- **Background Jobs**: ASP.NET Core Hosted Services (`IHostedService` / `BackgroundService`)
 
 ---
 
-## REST API Эндпоинты
+## Key Features
 
-### Аутентификация и Пользователи (`/api/User`)
-| Метод | Эндпоинт | Доступ | Описание |
+### 1. User & Authentication Management
+- User registration (`RegisterUserCommand`) with roles (`Customer`, `Organizer`). *Admin role registration is restricted at validation level.*
+- User authentication (`LoginUserCommand`) returning JWT bearer tokens.
+- Profile management (`GetCurrentUserQuery` at `/api/user/me`).
+
+### 2. Event Management
+- Event creation by organizers in `Draft` state with ticket category definitions (`CreateEventCommand`).
+- Event publication (`PublishEventCommand`) with authorization checks and notification dispatch (`EventPublishedNotification`).
+- Paginated event catalog listing with filtering and search (`GetPublishedEventsQuery`).
+- Detailed event information retrieval (`GetEventDetailsQuery`).
+
+### 3. Bookings & Ticket Reservations
+- Ticket reservation (`ReserveTicketsCommand`) with a temporary 15-minute seat lock (`ExpiresAt`).
+- Booking confirmation (`ConfirmBookingCommand`).
+- Automatic cancellation of expired pending reservations via a background worker (`ExpiredBookingsCleanerHostedService`), restoring available ticket inventory.
+
+---
+
+## REST API Reference
+
+### Authentication & Users (`/api/User`)
+| Method | Endpoint | Access | Description |
 | :--- | :--- | :--- | :--- |
-| `POST` | `/api/user/register` | Публичный | Регистрация нового пользователя |
-| `POST` | `/api/user/login` | Публичный | Вход в систему и получение JWT |
-| `GET` | `/api/user/me` | Bearer Auth | Получение профиля текущего пользователя |
+| `POST` | `/api/user/register` | Public | Register a new user |
+| `POST` | `/api/user/login` | Public | Authenticate user & retrieve JWT token |
+| `GET` | `/api/user/me` | Bearer Auth | Get current user profile |
 
-### Мероприятия (`/api/Events`)
-| Метод | Эндпоинт | Доступ | Описание |
+### Events (`/api/Events`)
+| Method | Endpoint | Access | Description |
 | :--- | :--- | :--- | :--- |
-| `POST` | `/api/events` | Organizer, Admin | Создание нового мероприятия |
-| `PUT` | `/api/events/{id}/publish` | Organizer | Публикация мероприятия |
-| `GET` | `/api/events` | Публичный | Поиск и пагинация опубликованных событий |
-| `GET` | `/api/events/{id}` | Публичный | Детальная информация о событии |
+| `POST` | `/api/events` | Organizer, Admin | Create a new event |
+| `PUT` | `/api/events/{id}/publish` | Organizer | Publish an event |
+| `GET` | `/api/events` | Public | List and filter published events |
+| `GET` | `/api/events/{id}` | Public | Get detailed event info |
 
-### Бронирования (`/api/Bookings`)
-| Метод | Эндпоинт | Доступ | Описание |
+### Bookings (`/api/Bookings`)
+| Method | Endpoint | Access | Description |
 | :--- | :--- | :--- | :--- |
-| `POST` | `/api/bookings` | Customer | Резервирование билетов |
-| `POST` | `/api/bookings/{id}/confirm` | Customer | Подтверждение бронирования |
+| `POST` | `/api/bookings` | Customer | Reserve tickets |
+| `POST` | `/api/bookings/{id}/confirm` | Customer | Confirm ticket reservation |
 
 ---
 
-## Настройка и Запуск
+## Configuration & Getting Started
 
-### Предварительные требования
-- **.NET 8.0 SDK** или новее
+### Prerequisites
+- **.NET 8.0 SDK** or later
 - **PostgreSQL Database**
 
-### Конфигурация (`appsettings.json`)
+### Configuration (`appsettings.json`)
 
-Создайте или настройте файл `appsettings.json` в проекте `WebApi`:
+Configure `appsettings.json` in the `WebApi` project:
 
 ```json
 {
@@ -117,9 +115,9 @@ EventBookingSystem/
   },
   "JwtSettings": {
     "Secret": "YourSUPER_Secret_Key_At_Least_32_Characters_Long!",
-    "Issuer": "TicketCraft",
-    "Audience": "TicketCraftClient",
-    "ExpiryMinutes": "120"
+    "Issuer": "EventBookingApi",
+    "Audience": "EventBookingClient",
+    "ExpiryMinutes": "60"
   },
   "Logging": {
     "LogLevel": {
@@ -130,33 +128,33 @@ EventBookingSystem/
 }
 ```
 
-### Запуск проекта
+### Running the Application
 
-1. **Клонируйте репозиторий**:
+1. **Clone the repository**:
    ```bash
    git clone https://github.com/your-username/event-booking-system.git
    cd event-booking-system
    ```
 
-2. **Примените миграции базы данных**:
+2. **Apply database migrations**:
    ```bash
    dotnet ef database update --project src/Infrastructure --startup-project src/WebApi
    ```
 
-3. **Запустите REST API**:
+3. **Run the REST API**:
    ```bash
    dotnet run --project src/WebApi
    ```
 
-API будет доступно по адресу `http://localhost:5000` (или `https://localhost:5001`).
+The API will be accessible at `http://localhost:5000` (or `https://localhost:5001`).
 
 ---
 
-## Обработка Ошибок
+## 🛡 Exception Handling
 
-В проекте настроен глобальный Middleware (`ExceptionHandlingMiddleware`), который перехватывает исключения и возвращает форматированный JSON-ответ:
+The application incorporates a global middleware (`ExceptionHandlingMiddleware`) that catches unhandled exceptions and produces standardized JSON error responses:
 
-- `400 Bad Request` — ошибки валидации `FluentValidation` с детализацией по полям.
-- `404 Not Found` — запрашиваемый ресурс (событие/пользователь) не найден (`NotFoundException`).
-- `409 Conflict` — бизнес-конфликты (`InvalidOperationException`).
-- `500 Internal Server Error` — непредвиденные ошибки сервера.
+- `400 Bad Request` — Validation failures (`FluentValidation`) with detailed field errors.
+- `404 Not Found` — Resource missing (`NotFoundException`).
+- `409 Conflict` — Business operation state conflicts (`InvalidOperationException`).
+- `500 Internal Server Error` — Unhandled server exceptions.
