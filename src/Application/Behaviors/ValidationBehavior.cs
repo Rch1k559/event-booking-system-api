@@ -19,24 +19,24 @@ namespace Application.Behaviors
             {
                 var context = new ValidationContext<TRequest>(request);
 
-                // ОПТИМИЗАЦИЯ: Запуск проверки всеми зарегистрированными FluentValidation-валидаторами 
-                // параллельно через Task.WhenAll для ускорения выполнения
+                // OPTIMIZATION: Execute all registered FluentValidation rules concurrently 
+                // using Task.WhenAll to minimize request latency.
                 var results = await Task.WhenAll(
                     validators.Select(v => v.ValidateAsync(context, cancellationToken)));
 
-                // Собираем ошибки из всех валидаторов в единый плоский список
+                // Aggregate errors from all validators into a single flat list
                 var failures = results
                     .SelectMany(r => r.Errors)
                     .Where(f => f is not null)
                     .ToList();
 
-                // Если есть хотя бы одна ошибка, прерываем выполнение пайплайна и выбрасываем исключение
+                // Short-circuit the request pipeline and throw exception if validation fails
                 if (failures.Count > 0)
                 {
                     throw new ValidationException(failures);
                 }
             }
-            // Если валидация прошла успешно, передаем управление следующему шагу (или Handler)
+            // Proceed to the next behavior or handler if validation succeeds
             return await next();
         }
     }

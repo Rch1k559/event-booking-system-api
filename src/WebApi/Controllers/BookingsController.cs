@@ -23,10 +23,10 @@ namespace WebApi.Controllers
         [Authorize]
         public async Task<IActionResult> Bookings([FromBody] ReserveTicketsCommand command)
         {
-            // БЕЗОПАСНОСТЬ: Идентификатор клиента (NameIdentifier / sub) извлекается из зашифрованного и 
-            // валидированного JWT-токена текущего HTTP-контекста, а не передается клиентом в JSON
+            // SECURITY: Extract CustomerId directly from the validated JWT token claims (NameIdentifier/sub) 
+            // rather than accepting it from the request body payload to prevent user impersonation.
             var getCustomerIdToken = User.FindFirstValue(ClaimTypes.NameIdentifier);
-            // Пересоздаем команду с гарантированно подлинным CustomerId
+            // Reconstruct the command with the authenticated user ID
             var query = new ReserveTicketsCommand(command.EventId, Guid.Parse(getCustomerIdToken!), command.Items);
             var result = await _mediator.Send(query);
 

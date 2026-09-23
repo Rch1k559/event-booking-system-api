@@ -19,24 +19,24 @@ namespace Application.Events.Handlers
 
         public async Task Handle(CancelExpiredBookingsCommand request, CancellationToken cancellationToken)
         {
-            // Расчет временного порога: брони в статусе Pending старше 15 минут считаются просроченными
+            // Threshold calculation: pending bookings older than 15 minutes are considered expired
             DateTime threshold = DateTime.UtcNow.AddMinutes(-15);
 
-            var expiredBooking = await _context.Bookings.Include(b => b.BookingItems)// Обязательно подгружаем позиции бронирования
+            var expiredBooking = await _context.Bookings.Include(b => b.BookingItems)// Eagerly load booking items to access quantities
                 .Where(b => b.Status == StatusBooking.Pending && b.CreatedAt < threshold).ToListAsync(cancellationToken);
-            // Возвращаем зарезервированное количество билетов обратно в доступный остаток
+
             foreach (var booking in expiredBooking)
             {
-                booking.Status = StatusBooking.Cancelled;
-                foreach(var item in booking.BookingItems)
+                booking.Status = StatusBooking.Cancelled;// Mark booking status as Cancelled
+                foreach (var item in booking.BookingItems)
                 {
                     var foundTicket = await _context.TicketTypes.FirstOrDefaultAsync(tt => tt.Id == item.TicketTypeId);
 
-                    foundTicket.AvailableQuantity += item.Quantity;
+                    foundTicket.AvailableQuantity += item.Quantity;// Re-add tickets to inventory
                 }
             }
 
-            await _context.SaveChangesAsync(cancellationToken);
+            await _context.SaveChangesAsync(cancellationToken);// Save changes in a single transaction
         }
     }
 }

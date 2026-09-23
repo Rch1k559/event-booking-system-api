@@ -8,6 +8,7 @@ using Microsoft.EntityFrameworkCore;
 using Microsoft.IdentityModel.Tokens;
 using System.Runtime.ExceptionServices;
 using System.Text;
+using WebApi.ExceptionHandlers;
 using WebApi.Middlewares;
 
 var builder = WebApplication.CreateBuilder(args);
@@ -49,6 +50,10 @@ builder.Services.AddMediatR(cfg =>
 builder.Services.AddScoped<IPasswordHasher, PasswordHasher>();
 builder.Services.AddScoped<IJwtTokenGenerator, JwtTokenGenerator>();
 builder.Services.AddScoped<IApplicationDbContext, AppDbContext>();
+
+builder.Services.AddExceptionHandler<ValidationExceptionHandler>();
+builder.Services.AddExceptionHandler<GlobalExceptionHandler>();
+builder.Services.AddExceptionHandler<NotFoundExceptionHandler>();
 
 builder.Services.AddControllers();
 builder.Services.AddAuthorization();

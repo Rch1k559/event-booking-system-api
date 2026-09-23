@@ -24,9 +24,8 @@ namespace WebApi.Middlewares
             {
                 context.Response.StatusCode = StatusCodes.Status400BadRequest;
 
-                // Группируем ошибки по имени свойства (PropertyName). 
-                // Это преобразует массив ValidationFailure в словарь вида: 
-                // { "Title": ["Name Title is required!", "Minimum length is 5"] }
+                // Group validation errors by property name to return a clean JSON error response: 
+                // { "Title": ["Title is required", "Minimum length is 5"] }
                 var errors = ex.Errors.GroupBy(g => g.PropertyName).ToDictionary(g => g.Key, g => g.Select(e => e.ErrorMessage).ToArray());
 
                 await context.Response.WriteAsJsonAsync(new

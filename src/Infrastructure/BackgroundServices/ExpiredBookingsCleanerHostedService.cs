@@ -28,10 +28,10 @@ namespace Infrastructure.BackgroundServices
             {
                 try
                 {
-                    // ВАЖНО: BackgroundService зарегистрирован как Singleton (живет всё время работы приложения). 
-                    // DbContext и обработчики MediatR зарегистрированы как Scoped. 
-                    // Внедрять Scoped-сервисы напрямую в конструктор Singleton нельзя (Captive Dependency). 
-                    // Поэтому на каждой итерации цикла вручную создается новый Scope и извлекается IMediator
+                    // CRITICAL: BackgroundService is registered as a Singleton (lives for the application lifetime). 
+                    // DbContext and MediatR handlers are registered as Scoped. 
+                    // Injecting Scoped services directly into a Singleton constructor causes a Captive Dependency bug. 
+                    // Therefore, a new IServiceScope is created manually per iteration to resolve IMediator.
                     _logger.LogInformation("Background service is live");
 
                     using var scope = _serviceProvider.CreateScope();
