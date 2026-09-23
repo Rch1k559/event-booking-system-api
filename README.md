@@ -2,7 +2,7 @@
 
 High-performance Event Booking REST API built with **Clean Architecture**, **CQRS** pattern, and **ASP.NET Core** (.NET 8).
 
-## 📐 Architecture Overview
+## Architecture Overview
 
 The project follows **Clean Architecture** principles with clear separation of concerns across layers:
 
@@ -41,7 +41,7 @@ EventBookingSystem/
 
 ---
 
-## 🛠 Tech Stack
+## Tech Stack
 
 - **Language & Framework**: C# / .NET 8
 - **Architectural Patterns**: Clean Architecture, CQRS, Pipeline Pattern, Repository/UnitOfWork (via EF Core `IApplicationDbContext`)
@@ -53,7 +53,7 @@ EventBookingSystem/
 
 ---
 
-## 🚀 Key Features
+## Key Features
 
 ### 1. User & Authentication Management
 - User registration (`RegisterUserCommand`) with roles (`Customer`, `Organizer`). *Admin role registration is restricted at validation level.*
@@ -73,7 +73,7 @@ EventBookingSystem/
 
 ---
 
-## 📡 REST API Reference
+## REST API Reference
 
 ### Authentication & Users (`/api/User`)
 | Method | Endpoint | Access | Description |
@@ -98,7 +98,7 @@ EventBookingSystem/
 
 ---
 
-## ⚙️ Configuration & Getting Started
+## Configuration & Getting Started
 
 ### Prerequisites
 - **.NET 8.0 SDK** or later
