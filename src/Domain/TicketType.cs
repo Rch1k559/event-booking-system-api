@@ -1,5 +1,6 @@
 ﻿using System;
 using System.Collections.Generic;
+using System.ComponentModel.DataAnnotations;
 using System.Text;
 
 public enum NameStatus
@@ -21,5 +22,8 @@ namespace Domain
 
         public Event Event { get; set; }
         public ICollection<BookingItem> BookingItems { get; set; } = new List<BookingItem>();
+
+        [Timestamp]
+        public byte[] RowVersion { get; set; }
     }
 }

@@ -28,6 +28,9 @@ namespace Infrastructure.Configurations
                 .IsRequired()
                 .HasMaxLength(50)
                 .HasConversion<string>();
+
+            builder.Property(tt => tt.RowVersion)
+                .IsRowVersion();
         }
     }
 }

@@ -1,8 +1,9 @@
-﻿using System;
+﻿using Domain;
+using Microsoft.EntityFrameworkCore;
+using Microsoft.EntityFrameworkCore.ChangeTracking;
+using System;
 using System.Collections.Generic;
 using System.Text;
-using Domain;
-using Microsoft.EntityFrameworkCore;
 
 namespace Application.Common.Intefaces
 {
@@ -14,6 +15,8 @@ namespace Application.Common.Intefaces
         DbSet<TicketType> TicketTypes { get; }
         DbSet<Booking> Bookings { get; }
         DbSet<BookingItem> BookingItems { get; }
+
+        ChangeTracker ChangeTracker { get; }
 
         Task<int> SaveChangesAsync(CancellationToken cancellationToken = default);
     }

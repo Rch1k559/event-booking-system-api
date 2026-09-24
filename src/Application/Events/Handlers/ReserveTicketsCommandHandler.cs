@@ -6,7 +6,9 @@ using MediatR;
 using Microsoft.EntityFrameworkCore;
 using System;
 using System.Collections.Generic;
-using System.Text;
+using System.Linq;
+using System.Threading;
+using System.Threading.Tasks;
 
 namespace Application.Events.Handlers
 {
@@ -21,64 +23,104 @@ namespace Application.Events.Handlers
 
         public async Task<BookingResponseDto> Handle(ReserveTicketsCommand request, CancellationToken cancellationToken)
         {
-            var foundEvent = await _context.Events.FirstOrDefaultAsync(e => e.Id == request.EventId && e.Status == StatusEvent.Published);
-
-            if (foundEvent == null)
+            if (request.Items == null || !request.Items.Any())
             {
-                throw new Exception("");
+                throw new Exception("Не выбрано ни одного билета для бронирования.");
             }
 
-            decimal totalPrice = 0;
-
-            var booking = new Booking
+            if (request.Items.Any(i => i.Quantity <= 0))
             {
-                Id = Guid.NewGuid(),
-                CustomerId = request.CustomerId,
-                EventId = request.EventId,
-                TotalPrice = totalPrice,
-                Status = StatusBooking.Pending,
-                CreatedAt = DateTime.UtcNow,
-                BookingItems = new List<BookingItem>()
-            };
-
-            foreach (var item in request.Items)
-            {
-                var foundTicket = await _context.TicketTypes.FirstOrDefaultAsync(tt => tt.Id == item.TicketTypeId);
-
-                if (foundTicket == null)
-                {
-                    throw new Exception("No ticket category found");
-                }
-
-                if (foundTicket.AvailableQuantity < item.Quantity)
-                {
-                    throw new Exception("Insufficient tickets available");
-                }
-
-                foundTicket.AvailableQuantity -= item.Quantity;
-
-                totalPrice += foundTicket.Price * item.Quantity;
-
-                var line = new BookingItem
-                {
-                    TicketTypeId = item.TicketTypeId,
-                    Quantity = item.Quantity,
-                    PricePerItem = foundTicket.Price
-                };
-
-                booking.BookingItems.Add(line);
+                throw new Exception("Количество билетов должно быть больше нуля.");
             }
 
-            booking.TotalPrice = totalPrice;
+            const int maxRetries = 3;
+            var ticketIds = request.Items.Select(i => i.TicketTypeId).Distinct().ToList();
 
-            _context.Bookings.Add(booking);
-            await _context.SaveChangesAsync(cancellationToken);
+            for (int attempt = 0; attempt < maxRetries; attempt++)
+            {
+                try
+                {
+                    _context.ChangeTracker.Clear();
 
-            return new BookingResponseDto(
-                BookingId: booking.Id,
-                TotalPrice: booking.TotalPrice,
-                ExpiresAt: booking.CreatedAt.AddMinutes(15)
-                );
+                    var foundEvent = await _context.Events
+                        .FirstOrDefaultAsync(e => e.Id == request.EventId && e.Status == StatusEvent.Published, cancellationToken);
+
+                    if (foundEvent == null)
+                    {
+                        throw new Exception($"Событие с ID {request.EventId} не найдено или еще не опубликовано.");
+                    }
+
+                    var foundTickets = await _context.TicketTypes
+                        .Where(tt => ticketIds.Contains(tt.Id))
+                        .ToListAsync(cancellationToken);
+
+                    if (foundTickets.Count != ticketIds.Count)
+                    {
+                        throw new Exception("Один или несколько типов билетов не найдены.");
+                    }
+
+                    decimal totalPrice = 0;
+                    var bookingItems = new List<BookingItem>();
+
+                    foreach (var item in request.Items)
+                    {
+                        var ticket = foundTickets.First(t => t.Id == item.TicketTypeId);
+
+                        if (ticket.EventId != request.EventId)
+                        {
+                            throw new Exception($"Билет {ticket.Name} не принадлежит данному мероприятию.");
+                        }
+
+                        if (ticket.AvailableQuantity < item.Quantity)
+                        {
+                            throw new Exception($"Недостаточно билетов категории '{ticket.Name}'. Доступно: {ticket.AvailableQuantity}.");
+                        }
+
+                        ticket.AvailableQuantity -= item.Quantity;
+
+                        totalPrice += ticket.Price * item.Quantity;
+
+                        bookingItems.Add(new BookingItem
+                        {
+                            TicketTypeId = item.TicketTypeId,
+                            Quantity = item.Quantity,
+                            PricePerItem = ticket.Price
+                        });
+                    }
+
+                    var booking = new Booking
+                    {
+                        Id = Guid.NewGuid(),
+                        CustomerId = request.CustomerId,
+                        EventId = request.EventId,
+                        TotalPrice = totalPrice,
+                        Status = StatusBooking.Pending,
+                        CreatedAt = DateTime.UtcNow,
+                        BookingItems = bookingItems
+                    };
+
+                    _context.Bookings.Add(booking);
+
+                    await _context.SaveChangesAsync(cancellationToken);
+
+                    return new BookingResponseDto(
+                        BookingId: booking.Id,
+                        TotalPrice: booking.TotalPrice,
+                        ExpiresAt: booking.CreatedAt.AddMinutes(15)
+                    );
+                }
+                catch (DbUpdateConcurrencyException)
+                {
+                    if (attempt == maxRetries - 1)
+                    {
+                        throw new Exception("Слишком много одновременных заказов. Пожалуйста, попробуйте снова через пару секунд.");
+                    }
+
+                    await Task.Delay(50 * (attempt + 1), cancellationToken);
+                }
+            }
+
+            throw new Exception("Не удалось завершить бронирование. Попробуйте снова.");
         }
     }
 }
